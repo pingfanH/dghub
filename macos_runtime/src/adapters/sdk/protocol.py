@@ -66,6 +66,7 @@ class PluginManifest(BaseModel):
     homepage: 'str | None' = None
     entry: 'str | None' = Field(None, description = '可执行文件相对路径；若为 None 则插件须由用户手动启动')
     config_schema: 'list[PluginConfigSection] | None' = None
+    capabilities: 'dict[str, Any] | None' = None
 
 
 class _BaseMsg(BaseModel):
