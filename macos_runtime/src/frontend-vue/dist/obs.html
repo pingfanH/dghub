@@ -10,7 +10,9 @@
      主色：#e2e8f0 浅灰白 / #22d3ee 青 / #67e8f9 浅青
      ============================================================ */
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: transparent; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+  html, body, #app { background: transparent !important; }
+  html { overflow: hidden; }
+  body { font-family: 'Segoe UI', sans-serif; overflow: hidden; }
   .container { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 
   /* 全局文字描边：无论 OBS 背景多花，都能保证可读 */
