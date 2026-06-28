@@ -110,6 +110,7 @@ class PyInstArchive:
     PYINST20_COOKIE_SIZE = 24           # For pyinstaller 2.0
     PYINST21_COOKIE_SIZE = 24 + 64      # For pyinstaller 2.1+
     MAGIC = b'MEI\014\013\012\013\016'  # Magic number which identifies pyinstaller
+    INNO_SETUP_MARKER = b'Inno Setup Setup Data'
 
     def __init__(self, path):
         self.filePath = path
@@ -167,7 +168,13 @@ class PyInstArchive:
                 break
 
         if self.cookiePos == -1:
-            print('[!] Error : Missing cookie, unsupported pyinstaller version or not a pyinstaller archive')
+            if self._checkForInnoSetupWrapper():
+                print('[!] Error : Missing PyInstaller cookie because this file is an Inno Setup installer wrapper')
+                print('[!] Extract the installer first, then run this script on the inner application executable')
+                print('[!] Example: innoextract -d {0}_inno {0}'.format(self.filePath))
+                print('[!] Example: python pyinstxtractor.py {0}_inno/app/<inner-executable>.exe'.format(self.filePath))
+            else:
+                print('[!] Error : Missing cookie, unsupported pyinstaller version or not a pyinstaller archive')
             return False
 
         self.fPtr.seek(self.cookiePos + self.PYINST20_COOKIE_SIZE, os.SEEK_SET)
@@ -180,6 +187,24 @@ class PyInstArchive:
             print('[+] Pyinstaller version: 2.0')
 
         return True
+
+
+    def _checkForInnoSetupWrapper(self):
+        markerLen = len(self.INNO_SETUP_MARKER)
+        searchChunkSize = 1024 * 1024
+
+        self.fPtr.seek(0, os.SEEK_SET)
+        prev = b''
+
+        while True:
+            data = self.fPtr.read(searchChunkSize)
+            if not data:
+                return False
+
+            if self.INNO_SETUP_MARKER in prev + data:
+                return True
+
+            prev = data[-(markerLen - 1):] if len(data) >= markerLen else data
 
 
     def getCArchiveInfo(self):

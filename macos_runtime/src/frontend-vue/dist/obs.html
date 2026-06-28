@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DGHub OBS Overlay</title>
+<style>
+  /* ============================================================
+     DGHub OBS Overlay — 白青 HUD 风
+     主色：#e2e8f0 浅灰白 / #22d3ee 青 / #67e8f9 浅青
+     ============================================================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: transparent; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+  .container { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* 全局文字描边：无论 OBS 背景多花，都能保证可读 */
+  .text-stroke {
+    text-shadow:
+      -1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85),
+      -1px 1px 0 rgba(0,0,0,0.85),  1px 1px 0 rgba(0,0,0,0.85),
+      0 0 6px rgba(0,0,0,0.6);
+  }
+
+  /* ---------- Bar 模式（横向进度条）---------- */
+  .bar-group { display: flex; align-items: center; gap: 10px; }
+  .bar-label {
+    color: rgba(226, 232, 240, 0.9);
+    font-size: 11px; font-weight: 700;
+    min-width: 14px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(34, 211, 238, 0.2);
+  }
+  .bar-bg {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+    box-shadow:
+      0 0 0 0.5px rgba(255, 255, 255, 0.06) inset,
+      0 1px 2px rgba(0, 0, 0, 0.4) inset;
+    position: relative;
+    overflow: hidden;
+  }
+  .bar-fill {
+    position: absolute; inset: 0 auto 0 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--c1, #0891b2), var(--c2, #22d3ee));
+    box-shadow:
+      0 0 4px var(--c2, #22d3ee),
+      0 0 10px var(--glow, rgba(34, 211, 238, 0.35));
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: width;
+  }
+  .bar-fill::after {
+    content: '';
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 8px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45));
+    border-top-right-radius: 999px;
+    border-bottom-right-radius: 999px;
+    pointer-events: none;
+  }
+  .bar-fill.ch-a { --c1: #0891b2; --c2: #22d3ee; --glow: rgba(34, 211, 238, 0.4); }
+  .bar-fill.ch-b { --c1: #0e7490; --c2: #67e8f9; --glow: rgba(103, 232, 249, 0.4); }
+  .bar-value {
+    color: rgba(226, 232, 240, 0.75);
+    font-size: 10px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.4px;
+    min-width: 52px;
+    text-align: right;
+    text-shadow: 0 0 4px rgba(0,0,0,0.95);
+  }
+
+  /* ---------- Ring 模式（圆环）---------- */
+  .ring-wrap { display: flex; justify-content: center; align-items: center; gap: 36px; }
+  .ring-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ring-svg { width: 100px; height: 100px; transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.06); stroke-width: 5; }
+  .ring-fill {
+    fill: none;
+    stroke-width: 5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+  .ring-fill.ch-a { stroke: #22d3ee; color: rgba(34, 211, 238, 0.5); }
+  .ring-fill.ch-b { stroke: #67e8f9; color: rgba(103, 232, 249, 0.45); }
+  .ring-text {
+    position: absolute;
+    color: rgba(226, 232, 240, 0.95);
+    font-size: 22px; font-weight: 700;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 10px rgba(34, 211, 238, 0.2);
+  }
+  .ring-wrapper { position: relative; display: flex; align-items: center; justify-content: center; }
+  .ring-sub {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 10px; font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.3px;
+  }
+  .ring-label {
+    color: rgba(226, 232, 240, 0.9);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ---------- Pulse 事件流（弹幕风） ---------- */
+  .pulse-list { display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  .pulse-item { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 2px 0; font-size: 12px; animation: slideUp 0.25s ease-out; }
+  .pulse-item.persistent {
+    font-size: 13px;
+    border-bottom: 1px solid rgba(34, 211, 238, 0.1);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+    animation: none;
+  }
+  /* 事件流：保留语义区分但偏暖金调和谐 */
+  .ev-user { color: #7dd3fc; font-weight: 600; }
+  .ev-item { color: #fbbf24; font-weight: 600; }  /* 礼物名/项目名（B站礼物等） */
+  .ev-label { color: #22d3ee; font-weight: 600; }
+  .ev-wave { color: rgba(255, 255, 255, 0.75); }
+  .ev-cause { color: rgba(255, 255, 255, 0.5); font-style: italic; }
+  .ev-mode { color: #67e8f9; font-weight: 600; }
+  .ev-plugin { color: #a7f3d0; font-weight: 600; }
+  .ev-pulse-name { color: rgba(34, 211, 238, 0.5); }
+  .ev-str { color: #22d3ee; font-weight: 700; }
+  .ev-delta { color: rgba(34, 211, 238, 0.65); font-weight: 600; }
+  .ev-masked { color: #fb923c; font-weight: 700; }
+  .ev-dur { color: rgba(255, 255, 255, 0.45); }
+  .ev-time {
+    color: rgba(226, 232, 240, 0.9);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 36px;
+    text-align: right;
+  }
+  .ev-sep { color: rgba(34, 211, 238, 0.2); margin: 0 1px; }
+
+  .disconnected {
+    color: rgba(226, 232, 240, 0.5);
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="container" id="app"><div class="disconnected">加载中...</div></div>
+<script>
+(function() {
+  var app = document.getElementById('app');
+  var RING_R = 40, RING_C = 2 * Math.PI * RING_R;
+  var data = { a: 0, b: 0, maxA: 0, maxB: 0, connected: false, plugins_status: {}, pulse_info: null, pulse_events: [] };
+  var cfg = {
+    style: 'bar',
+    show_strength: true,
+    show_pulse_info: true,
+    max_pulse_events: 5,
+    // 精简事件流字段：核心6个默认开，可选4个默认关
+    transient_event_fields: {
+      username:true, label:true, name:true, plugin:true, strength:true, remaining:true,  // 核心字段
+      duration:false, from_to:false, pulse_name:false, masked:false                     // 可选字段
+    },
+    persistent_event_fields: { label:true, name:true, plugin:true, strength:true },
+    show_event_plugins: {},
+    show_plugins: {},
+    show_fields: {}
+  };
+  var _pulseEnd = 0;
+  var _pulseTimer = null;
+  var _eventEndTimes = [];
+  var _renderedKeys = [];
+  var _currentStyle = null;
+  var _wasConnected = null;
+  var _refs = null;
+
+  var _nextEventId = 1;
+  var params = new URLSearchParams(location.search);
+  var styleOverride = params.get('style');
+
+  function getStyle() { return styleOverride || cfg.style || 'bar'; }
+
+  function buildBarHTML() {
+    return '<div class="bar-group">' +
+      '<span class="bar-label text-stroke">A</span>' +
+      '<div class="bar-bg"><div class="bar-fill ch-a" data-ref="fillA" style="width:0%"></div></div>' +
+      '<span class="bar-value text-stroke" data-ref="valA">0 / 0</span>' +
+    '</div>' +
+    '<div class="bar-group">' +
+      '<span class="bar-label text-stroke">B</span>' +
+      '<div class="bar-bg"><div class="bar-fill ch-b" data-ref="fillB" style="width:0%"></div></div>' +
+      '<span class="bar-value text-stroke" data-ref="valB">0 / 0</span>' +
+    '</div>';
+  }
+
+  function buildRingHTML() {
+    return '<div class="ring-wrap">' +
+      '<div class="ring-item">' +
+        '<span class="ring-label text-stroke">A</span>' +
+        '<div class="ring-wrapper">' +
+          '<svg class="ring-svg" viewBox="0 0 100 100">' +
+            '<circle class="ring-bg" cx="50" cy="50" r="' + RING_R + '"/>' +
+            '<circle class="ring-fill ch-a" data-ref="ringA" cx="50" cy="50" r="' + RING_R + '" stroke-dasharray="' + RING_C + '" stroke-dashoffset="' + RING_C + '"/>' +
+          '</svg>' +
+          '<span class="ring-text text-stroke" data-ref="ringTextA">0</span>' +
+        '</div>' +
+        '<span class="ring-sub text-stroke" data-ref="ringSubA">0 / 0</span>' +
+      '</div>' +
+      '<div class="ring-item">' +
+        '<span class="ring-label text-stroke">B</span>' +
+        '<div class="ring-wrapper">' +
+          '<svg class="ring-svg" viewBox="0 0 100 100">' +
+            '<circle class="ring-bg" cx="50" cy="50" r="' + RING_R + '"/>' +
+            '<circle class="ring-fill ch-b" data-ref="ringB" cx="50" cy="50" r="' + RING_R + '" stroke-dasharray="' + RING_C + '" stroke-dashoffset="' + RING_C + '"/>' +
+          '</svg>' +
+          '<span class="ring-text text-stroke" data-ref="ringTextB">0</span>' +
+        '</div>' +
+        '<span class="ring-sub text-stroke" data-ref="ringSubB">0 / 0</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function cacheRefs() {
+    _refs = {};
+    var els = app.querySelectorAll('[data-ref]');
+    for (var i = 0; i < els.length; i++) {
+      _refs[els[i].getAttribute('data-ref')] = els[i];
+    }
+  }
+
+  function initDOM() {
+    var style = getStyle();
+    _currentStyle = style;
+    _wasConnected = data.connected;
+    _renderedKeys = [];
+
+    if (!data.connected) {
+      app.innerHTML = '<div class="disconnected text-stroke">设备未连接</div>';
+      _refs = null;
+      return;
+    }
+
+    var html = '';
+    if (cfg.show_strength !== false) {
+      html += (style === 'ring') ? buildRingHTML() : buildBarHTML();
+    }
+    if (cfg.show_pulse_info !== false) {
+      html += '<div class="pulse-list" data-ref="pulseList"></div>';
+    }
+    app.innerHTML = html;
+    cacheRefs();
+    updateDOM();
+  }
+
+  function updateDOM() {
+    if (!_refs) return;
+    var pctA = data.maxA > 0 ? Math.min(100, data.a / data.maxA * 100) : 0;
+    var pctB = data.maxB > 0 ? Math.min(100, data.b / data.maxB * 100) : 0;
+
+    if (_currentStyle === 'ring') {
+      if (_refs.ringA) _refs.ringA.setAttribute('stroke-dashoffset', RING_C * (1 - pctA / 100));
+      if (_refs.ringB) _refs.ringB.setAttribute('stroke-dashoffset', RING_C * (1 - pctB / 100));
+      if (_refs.ringTextA) _refs.ringTextA.textContent = data.a;
+      if (_refs.ringTextB) _refs.ringTextB.textContent = data.b;
+      if (_refs.ringSubA) _refs.ringSubA.textContent = data.a + ' / ' + data.maxA;
+      if (_refs.ringSubB) _refs.ringSubB.textContent = data.b + ' / ' + data.maxB;
+    } else {
+      if (_refs.fillA) _refs.fillA.style.width = pctA.toFixed(1) + '%';
+      if (_refs.fillB) _refs.fillB.style.width = pctB.toFixed(1) + '%';
+      if (_refs.valA) _refs.valA.textContent = data.a + ' / ' + data.maxA;
+      if (_refs.valB) _refs.valB.textContent = data.b + ' / ' + data.maxB;
+    }
+
+    renderPulseList();
+  }
+
+  function buildItemHTML(ev, now, f) {
+    var segs = [];
+    // 按字段配置决定显示内容（f = transient_event_fields 或 persistent_event_fields）
+    var showAll = !f || Object.keys(f).length === 0;
+    function show(key) { return showAll || f[key] !== false; }
+
+    // 谁发的（username + name）— B站礼物等场景需要同时看到送礼人和礼物名
+    if (show('username')) {
+      var user = ev.username || '';
+      var itemName = ev.name || '';
+      // 避免重复显示（当 username 和 name 相同时只显示一个）
+      if (user && itemName && user !== itemName) {
+        segs.push('<span class="ev-user">@' + user + '</span>');
+        segs.push('<span class="ev-item">' + itemName + '</span>');
+      } else if (user) {
+        segs.push('<span class="ev-user">@' + user + '</span>');
+      } else if (itemName) {
+        segs.push('<span class="ev-item">' + itemName + '</span>');
+      }
+    }
+    // 事件类型标签
+    if (show('label') && ev.label) segs.push('<span class="ev-label">' + ev.label + '</span>');
+    // 来自插件
+    if (show('plugin') && ev.plugin) segs.push('<span class="ev-plugin">[' + ev.plugin + ']</span>');
+    // 强度（from→to 或仅 to）
+    if (show('from_to') && ev.from_pct != null && ev.to_pct != null) {
+      segs.push('<span class="ev-delta">' + ev.from_pct + '→' + ev.to_pct + '%</span>');
+    } else if (show('strength')) {
+      var toPct = (ev.to_pct != null) ? ev.to_pct : ev.strength_pct;
+      if (toPct != null) {
+        segs.push('<span class="ev-str">' + toPct + '%</span>');
+      } else if (ev.delta_pct != null) {
+        segs.push('<span class="ev-str">' + (ev.delta_pct >= 0 ? '+' : '') + ev.delta_pct + '%</span>');
+      }
+    }
+    // 波形预设名
+    if (show('pulse_name') && ev.pulse_name) segs.push('<span class="ev-pulse-name">~' + ev.pulse_name + '</span>');
+    // 被覆盖标记
+    if (show('masked') && ev.masked) segs.push('<span class="ev-masked">×覆</span>');
+    // 持续时间
+    if (show('duration') && ev.duration) segs.push('<span class="ev-dur">' + ev.duration + 's</span>');
+    // 剩余时间
+    var timeHtml = '';
+    if (!ev.persistent && show('remaining')) {
+      var sec = Math.max(0, (ev.end - now) / 1000);
+      timeHtml = ' <span class="ev-time">' + sec.toFixed(1) + 's</span>';
+    }
+    return segs.join('<span class="ev-sep">·</span>') + timeHtml;
+  }
+
+  function renderPulseList() {
+    if (!_refs || !_refs.pulseList) return;
+    var now = Date.now();
+    var maxEvents = cfg.max_pulse_events || 5;
+    var showEventPlugins = cfg.show_event_plugins || {};
+    var activeEvents = [];
+    for (var i = 0; i < _eventEndTimes.length && activeEvents.length < maxEvents; i++) {
+      var ev = _eventEndTimes[i];
+      // 事件流只展示瞬时触发的事件；持续状态由插件状态面板呈现，不在这里混排
+      if (ev.persistent) continue;
+      if ((ev.end - now) <= 0) continue;
+      if (ev.plugin && showEventPlugins[ev.plugin] === false) continue;
+      activeEvents.push(ev);
+    }
+    var newKeys = [];
+    for (var i = 0; i < activeEvents.length; i++) newKeys.push(activeEvents[i].key);
+
+    var existingNodes = {};
+    var children = _refs.pulseList.children;
+    for (var i = 0; i < children.length; i++) {
+      existingNodes[children[i].getAttribute('data-key')] = children[i];
+    }
+
+    var oldKeySet = {};
+    for (var i = 0; i < _renderedKeys.length; i++) oldKeySet[_renderedKeys[i]] = true;
+    for (var i = 0; i < newKeys.length; i++) {
+      if (oldKeySet[newKeys[i]]) delete oldKeySet[newKeys[i]];
+    }
+    for (var k in oldKeySet) {
+      if (existingNodes[k]) {
+        _refs.pulseList.removeChild(existingNodes[k]);
+        delete existingNodes[k];
+      }
+    }
+
+    for (var i = 0; i < activeEvents.length; i++) {
+      var ev = activeEvents[i];
+      var node = existingNodes[ev.key];
+      var f = ev.persistent ? (cfg.persistent_event_fields || {}) : (cfg.transient_event_fields || {});
+      var html = buildItemHTML(ev, now, f);
+      if (node) {
+        if (node.innerHTML !== html) {
+          node.innerHTML = html;
+        } else {
+          var timeEl = node.querySelector('.ev-time');
+          if (timeEl && !ev.persistent) {
+            var sec = Math.max(0, (ev.end - now) / 1000);
+            timeEl.textContent = sec.toFixed(1) + 's';
+          }
+        }
+      } else {
+        node = document.createElement('div');
+        node.className = 'pulse-item ' + (ev.persistent ? 'persistent' : '') + ' text-stroke';
+        node.setAttribute('data-key', ev.key);
+        node.innerHTML = html;
+        _refs.pulseList.appendChild(node);
+      }
+    }
+
+    var orderedChildren = _refs.pulseList.children;
+    for (var i = 0; i < activeEvents.length; i++) {
+      var expected = activeEvents[i].key;
+      if (i < orderedChildren.length && orderedChildren[i].getAttribute('data-key') !== expected) {
+        var target = existingNodes[expected] || _refs.pulseList.querySelector('[data-key="' + expected + '"]');
+        if (target) _refs.pulseList.insertBefore(target, orderedChildren[i]);
+      }
+    }
+
+    _renderedKeys = newKeys;
+    if (activeEvents.length === 0) {
+      _eventEndTimes = [];
+    }
+  }
+
+  function startPulseTimer() {
+    if (_pulseTimer) return;
+    _pulseTimer = setInterval(function() {
+      var now = Date.now();
+      var hasActive = false;
+      for (var i = 0; i < _eventEndTimes.length; i++) {
+        if (_eventEndTimes[i].persistent || _eventEndTimes[i].end > now) { hasActive = true; break; }
+      }
+      if (!hasActive) {
+        clearInterval(_pulseTimer);
+        _pulseTimer = null;
+        _renderedKeys = [];
+        if (_refs && _refs.pulseList) _refs.pulseList.innerHTML = '';
+        return;
+      }
+      renderPulseList();
+    }, 100);
+  }
+
+  function render() {
+    var style = getStyle();
+    var needsRebuild = (_currentStyle !== style) || (_wasConnected !== data.connected) || !_refs;
+
+    if (needsRebuild) {
+      initDOM();
+    } else {
+      updateDOM();
+    }
+  }
+
+  function loadConfig() {
+    fetch('/api/obs/config')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.status === 'success' && d.config) {
+          cfg = d.config;
+        }
+        connect();
+      })
+      .catch(function() { connect(); });
+  }
+
+  function connect() {
+    var wsUrl = 'ws://' + location.hostname + ':' + location.port + '/ws';
+    var ws = new WebSocket(wsUrl);
+    ws.onopen = function() { render(); };
+    ws.onmessage = function(e) {
+      try {
+        var msg = JSON.parse(e.data);
+        if (msg.type === 'status_update') {
+          data.a = msg.strength.a || 0;
+          data.b = msg.strength.b || 0;
+          data.maxA = msg.max_strength.a || 0;
+          data.maxB = msg.max_strength.b || 0;
+          data.connected = msg.connected;
+          data.plugins_status = msg.plugins_status || {};
+          if (msg.pulse_events && msg.pulse_events.length > 0) {
+            var now = Date.now();
+            var oldByKey = {};
+            for (var oi = 0; oi < _eventEndTimes.length; oi++) {
+              oldByKey[_eventEndTimes[oi].key] = _eventEndTimes[oi];
+            }
+            var newEvents = [];
+            for (var ei = 0; ei < msg.pulse_events.length; ei++) {
+              var pe = msg.pulse_events[ei];
+              var isPers = !!pe.persistent;
+              var evKey = null;
+              if (isPers) {
+                evKey = 'p_' + (pe.plugin || pe.label || ei);
+              } else if (pe.event_id != null) {
+                evKey = 'e_' + pe.event_id;
+              } else {
+                var matchKey = null;
+                for (var mk in oldByKey) {
+                  var old = oldByKey[mk];
+                  if (!old.persistent && old.label === (pe.label || '') && old.username === (pe.username || '') && old.end > now) {
+                    matchKey = mk;
+                    break;
+                  }
+                }
+                evKey = matchKey || ('e_' + _nextEventId++);
+              }
+              var existing = oldByKey[evKey];
+              newEvents.push({
+                key: evKey,
+                label: pe.label || '',
+                username: pe.username || '',
+                name: pe.name || '',
+                cause: pe.cause || '',
+                pulse_name: pe.pulse_name || '',
+                from_pct: (pe.from_pct != null) ? pe.from_pct : null,
+                to_pct: (pe.to_pct != null) ? pe.to_pct : null,
+                delta_pct: (pe.delta_pct != null) ? pe.delta_pct : null,
+                strength_pct: (pe.strength_pct != null) ? pe.strength_pct : pe.to_pct,
+                duration: pe.duration || null,
+                plugin: pe.plugin || '',
+                mode_label: pe.mode_label || '',
+                mode_key: pe.mode_key || '',
+                masked: !!pe.masked,
+                persistent: isPers,
+                end: pe.remaining != null ? now + pe.remaining * 1000 : (existing && !isPers ? existing.end : 0)
+              });
+              if (oldByKey[evKey]) delete oldByKey[evKey];
+            }
+            _eventEndTimes = newEvents;
+            startPulseTimer();
+          } else if (msg.pulse_info && msg.pulse_info.remaining > 0) {
+            var fallbackKey = 'e_' + _nextEventId++;
+            _eventEndTimes = [{
+              key: fallbackKey,
+              label: msg.pulse_info.name,
+              username: '',
+              name: msg.pulse_info.name,
+              strength_pct: null,
+              duration: null,
+              plugin: msg.pulse_info.plugin || '',
+              persistent: false,
+              end: Date.now() + msg.pulse_info.remaining * 1000
+            }];
+            startPulseTimer();
+          } else if (!msg.pulse_events || msg.pulse_events.length === 0) {
+            if (!msg.pulse_info) {
+              _eventEndTimes = [];
+            }
+          }
+          data.pulse_info = msg.pulse_info;
+          render();
+        } else if (msg.type === 'obs_config') {
+          cfg = msg.config;
+          render();
+        }
+      } catch(ex) {}
+    };
+    ws.onclose = function() { setTimeout(connect, 2000); };
+    ws.onerror = function() { ws.close(); };
+  }
+
+  loadConfig();
+})();
+</script>
+</body>
+</html>
