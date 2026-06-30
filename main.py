@@ -1,18 +1,54 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+ARTIFACT_ROOT = ROOT / "local_artifacts"
 RUNTIME_ROOT = ROOT
-if not (RUNTIME_ROOT / "main.pyc").exists() and (ROOT / "macos_runtime" / "main.pyc").exists():
-    RUNTIME_ROOT = ROOT / "macos_runtime"
+for candidate in (
+    ROOT,
+    ARTIFACT_ROOT / "macos_runtime",
+    ROOT / "macos_runtime",
+):
+    if (candidate / "main.pyc").exists():
+        RUNTIME_ROOT = candidate
+        break
+
+
+def _link_or_copy_file(source: Path, target: Path) -> None:
+    if target.exists() or not source.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.symlink_to(source)
+    except OSError:
+        shutil.copy2(source, target)
+
+
+def _ensure_frontend_entrypoints() -> None:
+    source_dist = ROOT / "src" / "frontend-vue" / "dist"
+    for runtime_root in (
+        RUNTIME_ROOT,
+        ARTIFACT_ROOT / "macos_runtime",
+        ROOT / "macos_runtime",
+    ):
+        if runtime_root != RUNTIME_ROOT and not runtime_root.exists():
+            continue
+        for relative_dist in (
+            Path("src/frontend-vue/dist"),
+            Path("_internal/src/frontend-vue/dist"),
+        ):
+            target_dist = runtime_root / relative_dist
+            for filename in ("index.html", "obs.html"):
+                _link_or_copy_file(source_dist / filename, target_dist / filename)
 
 os.chdir(RUNTIME_ROOT)
 sys.argv[0] = str(RUNTIME_ROOT / "main.py")
-for path in (RUNTIME_ROOT, ROOT):
+for path in (RUNTIME_ROOT, ARTIFACT_ROOT, ROOT):
     path_text = str(path)
     if path_text not in sys.path:
         sys.path.insert(0, path_text)
@@ -35,6 +71,7 @@ def main() -> None:
     from pydglab_macos_patch import apply_patches
 
     apply_patches()
+    _ensure_frontend_entrypoints()
 
     from src.api.app import _check_frontend_integrity, _find_frontend_path
 
