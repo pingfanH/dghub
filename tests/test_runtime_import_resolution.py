@@ -84,6 +84,7 @@ print(ok)
 print(manager.is_running())
 print(Path(captured["argv"][1]).resolve())
 print(captured["argv"][2])
+print("--locked" in captured["argv"])
 print(Path(captured["cwd"]).name)
 print(captured["stdout"])
 """
@@ -106,6 +107,7 @@ print(captured["stdout"])
                 "True",
                 str(ROOT / "main.py"),
                 "--overlay",
+                "True",
                 "macos_runtime",
                 "test-overlay-subprocess.log",
             ],

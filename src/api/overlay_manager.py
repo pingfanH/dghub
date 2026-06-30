@@ -68,6 +68,7 @@ class OverlayManager:
                 return True
 
             cfg = normalize_config(cfg)
+            cfg["locked"] = True
             self._token = secrets.token_urlsafe(16)
             self._cmd_queue = []
             self._last_geometry = {}

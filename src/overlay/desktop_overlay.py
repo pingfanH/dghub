@@ -107,13 +107,18 @@ class OverlayWindow(QWidget):
         self._locked = False
         self._drag_origin = None
 
-        self.setWindowFlags(
+        flags = (
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
             | Qt.WindowType.NoDropShadowWindowHint
         )
+        no_focus_flag = getattr(Qt.WindowType, "WindowDoesNotAcceptFocus", None)
+        if no_focus_flag is not None:
+            flags |= no_focus_flag
+        self.setWindowFlags(flags)
         self._force_transparent_widget(self)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         if hasattr(Qt.WidgetAttribute, "WA_MacAlwaysShowToolWindow"):
             self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow, True)
@@ -121,6 +126,7 @@ class OverlayWindow(QWidget):
         self.setGeometry(x, y, width, height)
 
         self._view = QWebEngineView(self)
+        self._view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._force_transparent_widget(self._view)
         self._view.page().setBackgroundColor(TRANSPARENT)
         self._view.setStyleSheet("background: transparent; border: 0;")
@@ -195,6 +201,8 @@ class OverlayWindow(QWidget):
             window.setCollectionBehavior_(behavior)
             window.setLevel_(int(getattr(AppKit, "NSStatusWindowLevel", AppKit.NSFloatingWindowLevel)))
             window.setReleasedWhenClosed_(False)
+            if window.respondsToSelector_(b"setIgnoresMouseEvents:"):
+                window.setIgnoresMouseEvents_(bool(self._locked))
         except Exception:
             pass
 
@@ -205,6 +213,8 @@ class OverlayWindow(QWidget):
         self._apply_visuals()
         if was_visible:
             self.show()
+        self.clearFocus()
+        self._view.clearFocus()
         self._schedule_macos_window_behavior()
 
     def _apply_visuals(self) -> None:
