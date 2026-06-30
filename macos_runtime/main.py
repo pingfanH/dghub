@@ -17,6 +17,10 @@ def main() -> None:
 
     multiprocessing.freeze_support()
 
+    from macos_tcc_patch import apply_tcc_usage_descriptions
+
+    apply_tcc_usage_descriptions()
+
     from src.utils.logger import get_logger
 
     log = get_logger("Boot")
