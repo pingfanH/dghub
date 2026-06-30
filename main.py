@@ -47,10 +47,11 @@ def _ensure_frontend_entrypoints() -> None:
 
 os.chdir(RUNTIME_ROOT)
 sys.argv[0] = str(RUNTIME_ROOT / "main.py")
-for path in (RUNTIME_ROOT, ROOT):
+for path in (ROOT, RUNTIME_ROOT):
     path_text = str(path)
-    if path_text not in sys.path:
-        sys.path.insert(0, path_text)
+    while path_text in sys.path:
+        sys.path.remove(path_text)
+sys.path[:0] = [str(ROOT), str(RUNTIME_ROOT)]
 
 
 def main() -> None:
