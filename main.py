@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import importlib.abc
+import importlib.util
 import shutil
 import sys
 from pathlib import Path
@@ -51,7 +53,23 @@ for path in (ROOT, RUNTIME_ROOT):
     path_text = str(path)
     while path_text in sys.path:
         sys.path.remove(path_text)
-sys.path[:0] = [str(ROOT), str(RUNTIME_ROOT)]
+sys.path[:0] = [str(RUNTIME_ROOT), str(ROOT)]
+
+
+class _OverlaySourceFinder(importlib.abc.MetaPathFinder):
+    MODULE_NAME = "src.overlay.desktop_overlay"
+
+    def find_spec(self, fullname: str, path=None, target=None):
+        if fullname != self.MODULE_NAME:
+            return None
+        source_path = ROOT / "src" / "overlay" / "desktop_overlay.py"
+        if not source_path.exists():
+            return None
+        return importlib.util.spec_from_file_location(fullname, source_path)
+
+
+if not any(isinstance(finder, _OverlaySourceFinder) for finder in sys.meta_path):
+    sys.meta_path.insert(0, _OverlaySourceFinder())
 
 
 def main() -> None:
