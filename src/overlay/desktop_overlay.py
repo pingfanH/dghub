@@ -16,6 +16,19 @@ from PyQt6.QtWidgets import QApplication, QFrame, QSizeGrip, QVBoxLayout, QWidge
 
 
 TRANSPARENT = QColor(0, 0, 0, 0)
+MACOS_COLLECTION_BEHAVIOR_NAMES = (
+    "NSWindowCollectionBehaviorCanJoinAllSpaces",
+    "NSWindowCollectionBehaviorFullScreenAuxiliary",
+    "NSWindowCollectionBehaviorStationary",
+    "NSWindowCollectionBehaviorIgnoresCycle",
+)
+
+
+def _macos_collection_behavior_mask(appkit) -> int:
+    mask = 0
+    for name in MACOS_COLLECTION_BEHAVIOR_NAMES:
+        mask |= int(getattr(appkit, name, 0))
+    return mask
 
 
 class ControlClient(QObject):
@@ -102,6 +115,8 @@ class OverlayWindow(QWidget):
         )
         self._force_transparent_widget(self)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        if hasattr(Qt.WidgetAttribute, "WA_MacAlwaysShowToolWindow"):
+            self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow, True)
         self.setWindowOpacity(max(0.1, min(1.0, opacity)))
         self.setGeometry(x, y, width, height)
 
@@ -139,6 +154,7 @@ class OverlayWindow(QWidget):
         self._report_timer.timeout.connect(self._report_geometry)
 
         QTimer.singleShot(0, lambda: self.set_locked(locked))
+        self._schedule_macos_window_behavior()
 
     @staticmethod
     def _force_transparent_widget(widget: QWidget) -> None:
@@ -149,6 +165,39 @@ class OverlayWindow(QWidget):
         palette.setColor(QPalette.ColorRole.Base, TRANSPARENT)
         widget.setPalette(palette)
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._schedule_macos_window_behavior()
+
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        self._schedule_macos_window_behavior()
+
+    def _schedule_macos_window_behavior(self) -> None:
+        if sys.platform != "darwin":
+            return
+        QTimer.singleShot(0, self._apply_macos_window_behavior)
+        QTimer.singleShot(250, self._apply_macos_window_behavior)
+
+    def _apply_macos_window_behavior(self) -> None:
+        if sys.platform != "darwin":
+            return
+        try:
+            import AppKit
+            import objc
+
+            native = objc.objc_object(c_void_p=int(self.winId()))
+            window = native.window() if native.respondsToSelector_(b"window") else native
+            if not window:
+                return
+
+            behavior = int(window.collectionBehavior()) | _macos_collection_behavior_mask(AppKit)
+            window.setCollectionBehavior_(behavior)
+            window.setLevel_(int(getattr(AppKit, "NSStatusWindowLevel", AppKit.NSFloatingWindowLevel)))
+            window.setReleasedWhenClosed_(False)
+        except Exception:
+            pass
+
     def set_locked(self, locked: bool) -> None:
         self._locked = locked
         was_visible = self.isVisible()
@@ -156,6 +205,7 @@ class OverlayWindow(QWidget):
         self._apply_visuals()
         if was_visible:
             self.show()
+        self._schedule_macos_window_behavior()
 
     def _apply_visuals(self) -> None:
         self._force_transparent_widget(self)
@@ -245,6 +295,12 @@ class OverlayWindow(QWidget):
             self._control.stop()
             QApplication.quit()
 
+    def keep_visible_on_current_space(self) -> None:
+        self._apply_macos_window_behavior()
+        if not self.isVisible():
+            self.show()
+        self.raise_()
+
 
 def _clamp_to_screens(x: int, y: int, width: int, height: int) -> tuple[int, int, int, int]:
     screens = QGuiApplication.screens()
@@ -303,6 +359,14 @@ def main(argv: list[str] | None = None) -> None:
     )
     control.start()
     win.show()
+    if sys.platform == "darwin":
+        keep_visible = lambda *_args: win.keep_visible_on_current_space()
+        app.applicationStateChanged.connect(keep_visible)
+        app.screenAdded.connect(keep_visible)
+        app.screenRemoved.connect(keep_visible)
+        app.primaryScreenChanged.connect(keep_visible)
+        if QGuiApplication.primaryScreen():
+            QGuiApplication.primaryScreen().geometryChanged.connect(keep_visible)
     sys.exit(app.exec())
 
 
