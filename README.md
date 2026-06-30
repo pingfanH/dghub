@@ -22,6 +22,12 @@ The source tree no longer depends on `main.pyc` or runtime `.pyc` files. Keep lo
 venv/bin/python main.py
 ```
 
+If you want to reuse another local Python 3.11 virtual environment, install the runtime dependencies first:
+
+```bash
+python -m pip install -r requirements-macos.txt
+```
+
 ## Notes
 
 - macOS Bluetooth permission fixes are applied by `macos_tcc_patch.py`.
