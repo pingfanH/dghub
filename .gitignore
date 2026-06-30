@@ -9,6 +9,8 @@ __pycache__/
 *.disabled
 config.json
 
+# Local reverse-engineering/extraction workspace.
+reverse_tools/
 DGHub-Setup.exe
 DGHub-Setup_extracted/
 DGLab-Console.exe_extracted/
@@ -22,19 +24,15 @@ innoextract/
 innoextract_win/
 pycdc/
 
-macos_runtime/logs/
-macos_runtime/config.json
-macos_runtime/__pycache__/
-macos_runtime/plugins/*
-!macos_runtime/plugins/demo_external/
-!macos_runtime/plugins/demo_external/**
-macos_runtime/src/**/__pycache__/
-macos_runtime/main.pyc
-macos_runtime/pydglab_ws/
-macos_runtime/src/**/*.pyc
-macos_runtime/src/frontend-vue/dist/.build_version
-macos_runtime/src/frontend-vue/dist/assets/
-macos_runtime/src/frontend-vue/dist/img/
-macos_runtime/src/frontend-vue/dist/favicon.svg
-macos_runtime/webview/**/*.pyc
-macos_runtime/webview/js/
+# Local runtime/build artifacts. Source lives at the repository root.
+macos_runtime/
+logs/
+plugins/*
+!plugins/demo_external/
+!plugins/demo_external/**
+src/**/__pycache__/
+src/frontend-vue/dist/.build_version
+src/frontend-vue/dist/assets/
+src/frontend-vue/dist/img/
+src/frontend-vue/dist/favicon.svg
+src/frontend-vue/dist/temp_qrcode.png

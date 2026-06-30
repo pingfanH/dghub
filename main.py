@@ -6,10 +6,16 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-os.chdir(ROOT)
-sys.argv[0] = str(ROOT / "main.py")
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+RUNTIME_ROOT = ROOT
+if not (RUNTIME_ROOT / "main.pyc").exists() and (ROOT / "macos_runtime" / "main.pyc").exists():
+    RUNTIME_ROOT = ROOT / "macos_runtime"
+
+os.chdir(RUNTIME_ROOT)
+sys.argv[0] = str(RUNTIME_ROOT / "main.py")
+for path in (RUNTIME_ROOT, ROOT):
+    path_text = str(path)
+    if path_text not in sys.path:
+        sys.path.insert(0, path_text)
 
 
 def main() -> None:

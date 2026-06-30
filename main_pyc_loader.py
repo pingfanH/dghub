@@ -6,7 +6,12 @@ from types import CodeType
 
 
 def load_main_pyc() -> dict:
-    path = Path(__file__).with_name("main.pyc")
+    root = Path(__file__).resolve().parent
+    candidates = (
+        root / "main.pyc",
+        root / "macos_runtime" / "main.pyc",
+    )
+    path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
     code = marshal.loads(path.read_bytes()[16:])
     module_globals = {
         "__name__": "dghub_original_main",
