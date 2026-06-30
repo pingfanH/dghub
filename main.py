@@ -56,20 +56,23 @@ for path in (ROOT, RUNTIME_ROOT):
 sys.path[:0] = [str(RUNTIME_ROOT), str(ROOT)]
 
 
-class _OverlaySourceFinder(importlib.abc.MetaPathFinder):
-    MODULE_NAME = "src.overlay.desktop_overlay"
+class _SourceOverrideFinder(importlib.abc.MetaPathFinder):
+    MODULE_SOURCES = {
+        "src.api.overlay_manager": ROOT / "src" / "api" / "overlay_manager.py",
+        "src.overlay.desktop_overlay": ROOT / "src" / "overlay" / "desktop_overlay.py",
+    }
 
     def find_spec(self, fullname: str, path=None, target=None):
-        if fullname != self.MODULE_NAME:
+        source_path = self.MODULE_SOURCES.get(fullname)
+        if source_path is None:
             return None
-        source_path = ROOT / "src" / "overlay" / "desktop_overlay.py"
         if not source_path.exists():
             return None
         return importlib.util.spec_from_file_location(fullname, source_path)
 
 
-if not any(isinstance(finder, _OverlaySourceFinder) for finder in sys.meta_path):
-    sys.meta_path.insert(0, _OverlaySourceFinder())
+if not any(isinstance(finder, _SourceOverrideFinder) for finder in sys.meta_path):
+    sys.meta_path.insert(0, _SourceOverrideFinder())
 
 
 def main() -> None:
