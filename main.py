@@ -7,11 +7,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-ARTIFACT_ROOT = ROOT / "local_artifacts"
 RUNTIME_ROOT = ROOT
 for candidate in (
     ROOT,
-    ARTIFACT_ROOT / "macos_runtime",
     ROOT / "macos_runtime",
 ):
     if (candidate / "main.pyc").exists():
@@ -31,13 +29,14 @@ def _link_or_copy_file(source: Path, target: Path) -> None:
 
 def _ensure_frontend_entrypoints() -> None:
     source_dist = ROOT / "src" / "frontend-vue" / "dist"
-    for runtime_root in (
-        RUNTIME_ROOT,
-        ARTIFACT_ROOT / "macos_runtime",
-        ROOT / "macos_runtime",
-    ):
-        if runtime_root != RUNTIME_ROOT and not runtime_root.exists():
-            continue
+    runtime_roots = []
+    if RUNTIME_ROOT != ROOT:
+        runtime_roots.append(RUNTIME_ROOT)
+    legacy_runtime = ROOT / "macos_runtime"
+    if legacy_runtime.exists() and legacy_runtime not in runtime_roots:
+        runtime_roots.append(legacy_runtime)
+
+    for runtime_root in runtime_roots:
         for relative_dist in (
             Path("src/frontend-vue/dist"),
             Path("_internal/src/frontend-vue/dist"),
@@ -48,7 +47,7 @@ def _ensure_frontend_entrypoints() -> None:
 
 os.chdir(RUNTIME_ROOT)
 sys.argv[0] = str(RUNTIME_ROOT / "main.py")
-for path in (RUNTIME_ROOT, ARTIFACT_ROOT, ROOT):
+for path in (RUNTIME_ROOT, ROOT):
     path_text = str(path)
     if path_text not in sys.path:
         sys.path.insert(0, path_text)

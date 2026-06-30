@@ -9,7 +9,6 @@ def load_main_pyc() -> dict:
     root = Path(__file__).resolve().parent
     candidates = (
         root / "main.pyc",
-        root / "local_artifacts" / "macos_runtime" / "main.pyc",
         root / "macos_runtime" / "main.pyc",
     )
     path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])

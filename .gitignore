@@ -9,7 +9,7 @@ __pycache__/
 *.disabled
 config.json
 
-# Local reverse-engineering/extraction workspace.
+# Archive of installer/extraction/decompile materials from before source recovery.
 local_artifacts/
 reverse_tools/
 DGHub-Setup.exe
