@@ -1,11 +1,18 @@
 .DS_Store
 .venv*/
 __pycache__/
+*.pyc
+*.pyd
+*.dll
+*.exe
+*.woff2
+*.disabled
 config.json
 
 DGHub-Setup.exe
 DGHub-Setup_extracted/
 DGLab-Console.exe_extracted/
+latest_*/
 decompiled_decompyle3/
 decompiled_pycdc/
 decompiled_src/
@@ -18,4 +25,16 @@ pycdc/
 macos_runtime/logs/
 macos_runtime/config.json
 macos_runtime/__pycache__/
+macos_runtime/plugins/*
+!macos_runtime/plugins/demo_external/
+!macos_runtime/plugins/demo_external/**
 macos_runtime/src/**/__pycache__/
+macos_runtime/main.pyc
+macos_runtime/pydglab_ws/
+macos_runtime/src/**/*.pyc
+macos_runtime/src/frontend-vue/dist/.build_version
+macos_runtime/src/frontend-vue/dist/assets/
+macos_runtime/src/frontend-vue/dist/img/
+macos_runtime/src/frontend-vue/dist/favicon.svg
+macos_runtime/webview/**/*.pyc
+macos_runtime/webview/js/
