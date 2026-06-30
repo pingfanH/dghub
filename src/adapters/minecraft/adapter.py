@@ -1,0 +1,20 @@
+# Source Generated with Decompyle++
+# File: adapter.pyc (Python 3.11)
+
+'''MC 适配器 — 接收 DGHub-MC Mod 推送的游戏事件，用自己的模式策略计算强度和波形'''
+import asyncio
+from src.adapters.triple_mode_adapter import TripleModeAdapter
+from src.adapters.minecraft.listener import MCListener
+from src.adapters.minecraft.modes import NormalMode, FixedMode, ChallengeMode
+from src.adapters.startup_check import startup_check, startup_step
+from src.utils.logger import get_logger
+logger = get_logger('MC')
+MODE_LABELS = {
+    'normal': '动态强度',
+    'fixed': '固定强度',
+    'challenge': '挑战模式' }
+
+class MCAdapter(TripleModeAdapter):
+    pass
+# WARNING: Decompyle incomplete
+
