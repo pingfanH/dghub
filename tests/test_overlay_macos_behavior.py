@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import inspect
 import unittest
 
 from src.overlay.desktop_overlay import (
     MACOS_COLLECTION_BEHAVIOR_NAMES,
+    OverlayWindow,
     _macos_collection_behavior_mask,
 )
 
@@ -27,6 +29,10 @@ class OverlayMacOSBehaviorTest(unittest.TestCase):
             },
         )
         self.assertEqual(_macos_collection_behavior_mask(FakeAppKit), 337)
+
+    def test_keep_visible_does_not_raise_window_and_steal_focus(self) -> None:
+        source = inspect.getsource(OverlayWindow.keep_visible_on_current_space)
+        self.assertNotIn("raise_", source)
 
 
 if __name__ == "__main__":

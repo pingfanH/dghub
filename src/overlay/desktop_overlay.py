@@ -309,7 +309,8 @@ class OverlayWindow(QWidget):
         self._apply_macos_window_behavior()
         if not self.isVisible():
             self.show()
-        self.raise_()
+            self.clearFocus()
+            self._view.clearFocus()
 
 
 def _clamp_to_screens(x: int, y: int, width: int, height: int) -> tuple[int, int, int, int]:
