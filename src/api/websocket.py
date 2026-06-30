@@ -37,14 +37,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         state.websocket_connections.add(websocket)
 
     try:
-        await websocket.send_text(json.dumps({"type": "hello"}, ensure_ascii=False))
         payload = collect_status_payload()
-        await websocket.send_text(
-            json.dumps(
-                {"type": "status_update", "data": payload or _fallback_status_payload()},
-                ensure_ascii=False,
-            )
-        )
+        await websocket.send_text(json.dumps({"type": "hello"}, ensure_ascii=False))
+        await websocket.send_text(json.dumps({"type": "status_update", **(payload or _fallback_status_payload())}, ensure_ascii=False))
         ping_task = asyncio.create_task(_ping_loop(websocket))
         try:
             while True:
@@ -67,11 +62,10 @@ async def _ping_loop(websocket: WebSocket) -> None:
 
 def _fallback_status_payload() -> dict:
     return {
+        "connected": bool(state.dglab),
         "device_type": state.device_type,
-        "strength_a": state.strength_a,
-        "strength_b": state.strength_b,
-        "max_strength_A": state.max_strength_A,
-        "max_strength_B": state.max_strength_B,
-        "plugins": state.plugins_status,
+        "strength": {"a": state.strength_a, "b": state.strength_b},
+        "max_strength": {"a": state.max_strength_A, "b": state.max_strength_B},
+        "plugins_status": state.plugins_status,
         "qrcode_path": state.qrcode_path,
     }

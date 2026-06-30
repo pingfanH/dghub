@@ -22,12 +22,11 @@ def collect_status_payload() -> dict:
         state.plugins_status = plugins_status
 
     return {
+        "connected": bool(state.dglab),
         "device_type": state.device_type,
-        "strength_a": state.strength_a,
-        "strength_b": state.strength_b,
-        "max_strength_A": state.max_strength_A,
-        "max_strength_B": state.max_strength_B,
-        "plugins": plugins_status,
+        "strength": {"a": state.strength_a, "b": state.strength_b},
+        "max_strength": {"a": state.max_strength_A, "b": state.max_strength_B},
+        "plugins_status": plugins_status,
         "qrcode_path": state.qrcode_path,
         "pulse_events": [],
     }

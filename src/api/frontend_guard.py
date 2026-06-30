@@ -1,31 +1,48 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi.responses import HTMLResponse
 
 
-REQUIRED_FRONTEND_FILES = ("index.html",)
+STATIC_REF_RE = re.compile(r'''(?:src|href)=["'](?:/static/)?([^"']+)["']''')
 
 
 def _frontend_candidates() -> list[Path]:
     root = Path.cwd()
     return [
-        root / "src/frontend-vue/dist",
         root / "macos_runtime/src/frontend-vue/dist",
         root / "macos_runtime/_internal/src/frontend-vue/dist",
+        root / "src/frontend-vue/dist",
     ]
 
 
 def _find_frontend_path() -> Path | None:
+    fallback = None
     for candidate in _frontend_candidates():
-        if (candidate / "index.html").exists():
+        if not (candidate / "index.html").exists():
+            continue
+        if fallback is None:
+            fallback = candidate
+        if not _check_frontend_integrity(candidate):
             return candidate
-    return None
+    return fallback
 
 
 def _check_frontend_integrity(frontend_path: Path) -> list[str]:
-    return [name for name in REQUIRED_FRONTEND_FILES if not (frontend_path / name).exists()]
+    index = frontend_path / "index.html"
+    if not index.exists():
+        return ["index.html"]
+    missing = []
+    html = index.read_text(encoding="utf-8", errors="ignore")
+    for ref in STATIC_REF_RE.findall(html):
+        if ref.startswith(("http://", "https://", "data:")):
+            continue
+        relative = ref.lstrip("/")
+        if not (frontend_path / relative).exists():
+            missing.append(relative)
+    return missing
 
 
 def _serve_index_or_diagnostic() -> HTMLResponse:
