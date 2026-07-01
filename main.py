@@ -47,6 +47,48 @@ def _ensure_frontend_entrypoints() -> None:
             for filename in ("index.html", "obs.html"):
                 _link_or_copy_file(source_dist / filename, target_dist / filename)
 
+
+def _server_bind_host() -> str:
+    return os.environ.get("DGHUB_BIND_HOST", "0.0.0.0")
+
+
+def _access_log_enabled() -> bool:
+    return os.environ.get("DGHUB_ACCESS_LOG", "").lower() in ("1", "true", "yes")
+
+
+def _patch_server_bind(original_main: dict) -> None:
+    def run_server(port: int = 8000) -> None:
+        uvicorn = original_main["uvicorn"]
+        config = uvicorn.Config(
+            original_main["app"],
+            host=_server_bind_host(),
+            port=port,
+            log_level="info",
+            reload=False,
+            access_log=_access_log_enabled(),
+        )
+        original_main["_main_server"] = uvicorn.Server(config)
+        original_main["_main_server"].run()
+
+    def start_server() -> None:
+        port = original_main["_get_port"]()
+        os.environ["DGHUB_SERVER_PORT"] = str(port)
+        bind_host = _server_bind_host()
+        print(f"DGHub 服务启动中 -> http://{bind_host}:{port}")
+        print(f"本机访问地址 -> http://127.0.0.1:{port}")
+        print(f"OBS 浏览器源地址 -> http://{bind_host}:{port}/obs")
+        original_main["uvicorn"].run(
+            original_main["app"],
+            host=bind_host,
+            port=port,
+            log_level="info",
+            access_log=_access_log_enabled(),
+        )
+
+    original_main["run_server"] = run_server
+    original_main["start_server"] = start_server
+
+
 os.chdir(RUNTIME_ROOT)
 sys.argv[0] = str(RUNTIME_ROOT / "main.py")
 for path in (ROOT, RUNTIME_ROOT):
@@ -109,6 +151,7 @@ def main() -> None:
     from main_pyc_loader import load_main_pyc
 
     original_main = load_main_pyc()
+    _patch_server_bind(original_main)
 
     if "--server" in sys.argv:
         original_main["start_server"]()

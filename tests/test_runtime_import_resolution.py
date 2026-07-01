@@ -113,6 +113,58 @@ print(captured["stdout"])
             ],
         )
 
+    def test_runtime_server_bind_is_patched_to_all_interfaces(self) -> None:
+        code = """
+import main
+
+class FakeConfig:
+    def __init__(self, app, host, port, log_level, reload=False, access_log=False):
+        self.host = host
+        self.port = port
+        print(f"config={host}:{port}:reload={reload}")
+
+class FakeServer:
+    def __init__(self, config):
+        self.config = config
+
+    def run(self):
+        print(f"server={self.config.host}:{self.config.port}")
+
+class FakeUvicorn:
+    Config = FakeConfig
+    Server = FakeServer
+
+    @staticmethod
+    def run(app, host, port, log_level, access_log=False):
+        print(f"run={host}:{port}")
+
+original = {
+    "uvicorn": FakeUvicorn,
+    "app": object(),
+    "_get_port": lambda: 8123,
+}
+main._patch_server_bind(original)
+original["run_server"](9001)
+original["start_server"]()
+"""
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        env["DGHUB_BIND_HOST"] = "0.0.0.0"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("config=0.0.0.0:9001:reload=False", result.stdout)
+        self.assertIn("server=0.0.0.0:9001", result.stdout)
+        self.assertIn("run=0.0.0.0:8123", result.stdout)
+        self.assertIn("http://0.0.0.0:8123", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
